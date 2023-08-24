@@ -1,0 +1,28 @@
+/* styles.css */
+
+@keyframes blink {
+    0%, 50% { opacity: 1; } /* Visible for the first half and invisible for the second half */
+    25%, 75% { opacity: 0; } /* Invisible for the first half and visible for the second half */
+    100% { opacity: 1; } /* Visible at the end */
+}
+
+.handset-status {
+    font-weight: bold; /* Make text bold */
+    text-transform: uppercase;
+    font-size: 40px;
+}
+
+.handset-status .ringing {
+    color: green;      /* Change text color to green */
+    animation: blink 1s linear infinite;
+}
+
+.handset-status .answered {
+    color: blue;      /* Change text color to green */
+}
+
+.handset-status .opened {
+    color: red;      /* Change text color to green */
+    animation: blink 0.5s linear infinite;
+
+}

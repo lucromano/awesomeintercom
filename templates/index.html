@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="../static/styles/styles.css">
+
+<!--    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>-->
+
+<!--<script>-->
+<!--    // Function to refresh the page-->
+<!--    function refreshPage() {-->
+<!--        location.reload();-->
+<!--    }-->
+
+<!--    // Listen for POST requests and trigger refresh on success-->
+<!--    $(document).ready(function() {-->
+<!--        $(document).on('submit', 'form', function(event) {-->
+<!--            event.preventDefault(); // Prevent the default form submission-->
+
+<!--            // Perform the AJAX POST request-->
+<!--            $.post({-->
+<!--                url: '/receive_data', // Replace with your actual URL-->
+<!--                data: $(this).serialize(),-->
+<!--                success: function() {-->
+<!--                    refreshPage(); // Refresh the page on successful POST-->
+<!--                }-->
+<!--            });-->
+<!--        });-->
+<!--    });-->
+<!--</script>-->
+
+
+
+    <script>
+            // Function to refresh the page every 'interval' milliseconds
+            function refreshPage() {
+                location.reload();
+            }
+
+            // Refresh the page every 5 seconds (5000 milliseconds)
+            setInterval(refreshPage, 5000);
+        </script>
+</head>
+<body>
+
+    <div class="handset-status">
+        {% if handset_status == 'ringing' %}
+            <p class="ringing">{{ handset_status }}</p>
+        {% elif handset_status == 'answered' %}
+            <p class="answered">{{ handset_status }}</p>
+        {% elif handset_status == 'opened' %}
+            <p class="opened">{{ handset_status }}</p>
+        {% else %}
+            <p>{{ handset_status }}</p>
+        {% endif %}
+    </div>
+
+
+    <form method="post" action="{{ url_for('send_command') }}">
+        <button type="submit" name="command" value="answer">Answer</button>
+        <button type="submit" name="command" value="open">Open Door</button>
+        <button type="submit" name="command" value="hangup">Hang Up</button>
+    </form>
+</body>
+</html>
