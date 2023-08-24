@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 import requests
-import utils
+import logging
 
 app = Flask(__name__)
-
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 handset_status = 'IDLE'
 
@@ -19,20 +20,27 @@ def index():
     return render_template('index.html', handset_status=handset_status)
 
 
+
+
 @app.route('/send_command', methods=['POST'])
 def send_command():
-    command = request.form.get('command')
+    command = request.get_json()['rpi_command']
+    print(command)
 
     rpi_url = "http://192.168.1.111:5000/rpi_command"
     response = requests.post(rpi_url, json={'rpi_command': command})
 
     if response.status_code == 200:
-
-        print("Command sent successfully!")
+        return jsonify({'message': 'command send success'})
     else:
-        print("Failed to send command to Raspberry Pi.")
+        return jsonify({'message': 'command send error'})
 
-    return redirect('/')
+
+@app.route('/voltages', methods=['GET', 'POST'])
+def voltages():
+    data = request.get_json()
+    print(data)
+    return jsonify({'message': 'success'})
 
 
 app.run(host='0.0.0.0', port=5100)
