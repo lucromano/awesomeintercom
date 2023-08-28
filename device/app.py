@@ -1,8 +1,10 @@
-import automationhat
+import automationhat as ah
 from flask import Flask, request, jsonify
 import time
 import threading
 import requests
+
+ah.enable_auto_lights(False)
 
 lock = threading.Lock()
 
@@ -13,21 +15,27 @@ def poll_inputs():
     while True:
 
         with lock:
-            a1 = automationhat.analog.one.read()
-            a2 = automationhat.analog.two.read()
+            a1 = ah.analog.one.read()
+            a2 = ah.analog.two.read()
+            #             a3 = ah.analog.three.read()
+
+            r1 = ah.relay.one.read()
+            r2 = ah.relay.two.read()
+            r3 = ah.relay.three.read()
+
             if a1 > 3.0 and a2 > 3.0:
                 send_status('ringing')
             elif 0.5 > a1 > 1.5 and 1.0 > a2 > 5.0:
                 send_status('answered')
 
-            send_voltages(a1, a2)
+            send_hat_reads(a1, a2, r1, r2, r3)
 
-        time.sleep(5)
+        time.sleep(1)
 
 
-def send_voltages(a1, a2):
+def send_hat_reads(a1, a2, r1, r2, r3):
     voltages_url = "http://192.168.1.105:5100/voltages"
-    response = requests.post(voltages_url, json={'voltages': [a1, a2]})
+    response = requests.post(voltages_url, json={'reads': [a1, a2, r1, r2, r3]})
 
 
 def send_status(status):
@@ -46,19 +54,19 @@ def rpi_command():
     command = data['rpi_command']
 
     if command == 'answer':
-        automationhat.relay.two.toggle()
-        automationhat.relay.three.toggle()
-        automationhat.output.one.on()
+        ah.relay.two.on()
+        ah.relay.three.on()
+        ah.output.one.on()
         time.sleep(0.3)
     elif command == 'open':
-        automationhat.relay.one.toggle()
+        ah.relay.one.on()
         time.sleep(0.3)
-        automationhat.relay.one.toggle()
+        ah.relay.one.off()
         send_status('opened')
     elif command == 'hangup':
-        automationhat.relay.two.toggle()
-        automationhat.relay.three.toggle()
-        automationhat.output.one.off()
+        ah.relay.two.off()
+        ah.relay.three.off()
+        ah.output.one.off()
         time.sleep(0.3)
         send_status('idle')
 
@@ -69,5 +77,6 @@ polling_thread = threading.Thread(target=poll_inputs)
 polling_thread.daemon = True
 polling_thread.start()
 app.run(host='0.0.0.0', port=5000)
+
 
 

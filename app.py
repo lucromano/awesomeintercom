@@ -1,26 +1,54 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import requests
 import logging
+from forms import *
+from werkzeug.security import generate_password_hash, check_password_hash
+import utils
+import os
+
+
 
 app = Flask(__name__)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
+
+app.secret_key = os.urandom(24)
 
 handset_status = 'IDLE'
 
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    global handset_status
+    if session.get('user_type') == 'user':
+        return redirect(url_for('home'))
 
-    if request.method == 'POST':
-        data = request.get_json()
-        handset_status = data['status']
+    else:
+        form = LoginForm()
 
-    return render_template('index.html', handset_status=handset_status)
+        if form.validate_on_submit():
+            hashed_password = utils.user_login(form.email.data)[0][0]
+            password_check = check_password_hash(hashed_password, form.password.data)
+            if password_check:
+                session['user_type'] = 'user'
+                return redirect(url_for('home'))
+            else:
+                return redirect(url_for('index'))
+        else:
+            return render_template('index.html', form=form)
 
 
+@app.route('/home', methods=['GET', 'POST'])
+def home():
+    if session.get('user_type') == 'user':
+        global handset_status
 
+        if request.method == 'POST':
+            data = request.get_json()
+            handset_status = data['status']
+
+        return render_template('home.html', handset_status=handset_status)
+    else:
+        return redirect(url_for('index'))
 
 @app.route('/send_command', methods=['POST'])
 def send_command():
