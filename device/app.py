@@ -30,16 +30,16 @@ def poll_inputs():
 
             send_hat_reads(a1, a2, r1, r2, r3)
 
-        time.sleep(1)
+        time.sleep(2)
 
 
 def send_hat_reads(a1, a2, r1, r2, r3):
-    voltages_url = "http://192.168.1.105:5100/voltages"
+    voltages_url = "https://awesomeinter.com:5000/voltages"
     response = requests.post(voltages_url, json={'reads': [a1, a2, r1, r2, r3]})
 
 
 def send_status(status):
-    status_url = "http://192.168.1.105:5100/"
+    status_url = "https://awesomeinter.com:5000/home"
     response = requests.post(status_url, json={'status': status})
 
     if response.status_code == 200:
@@ -54,19 +54,19 @@ def rpi_command():
     command = data['rpi_command']
 
     if command == 'answer':
+        ah.relay.one.on()
         ah.relay.two.on()
-        ah.relay.three.on()
-        ah.output.one.on()
+        # ah.output.one.on()
         time.sleep(0.3)
     elif command == 'open':
-        ah.relay.one.on()
+        ah.relay.three.on()
         time.sleep(0.3)
-        ah.relay.one.off()
+        ah.relay.three.off()
         send_status('opened')
     elif command == 'hangup':
+        ah.relay.one.off()
         ah.relay.two.off()
-        ah.relay.three.off()
-        ah.output.one.off()
+        # ah.output.one.off()
         time.sleep(0.3)
         send_status('idle')
 
