@@ -25,6 +25,8 @@ def index():
     else:
         form = LoginForm()
 
+        create = CreateForm()
+
         if form.validate_on_submit():
             hashed_password = utils.user_login(form.email.data)[0][0]
             password_check = check_password_hash(hashed_password, form.password.data)
@@ -33,8 +35,13 @@ def index():
                 return redirect(url_for('home'))
             else:
                 return redirect(url_for('index'))
+
+        elif create.validate_on_submit():
+            utils.create_user('Luciano', 'Romano', 'luciano@awesomeinter.com', 'luctech12345!')
+            return redirect(url_for('index'))
+
         else:
-            return render_template('index.html', form=form)
+            return render_template('index.html', form=form, create=create)
 
 
 @app.route('/home', methods=['GET', 'POST'])
@@ -49,6 +56,7 @@ def home():
         return render_template('home.html', handset_status=handset_status)
     else:
         return redirect(url_for('index'))
+
 
 @app.route('/send_command', methods=['POST'])
 def send_command():
