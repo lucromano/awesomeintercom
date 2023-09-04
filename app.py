@@ -19,6 +19,7 @@ app.secret_key = os.urandom(24)
 
 handset_status = 'IDLE'
 listening_thread = None
+stop_audio_threads = threading.Event()
 
 sample_rate = 44100
 channels = 1
@@ -88,41 +89,41 @@ def voltages():
     print(data)
     return jsonify({'message': 'success'})
 
-
-def listen_audio():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.bind(('0.0.0.0', 12334))
-        server_socket.listen(1)
-        print("Listening for audio data...")
-
-        connection = None
-
-        try:
-            connection, address = server_socket.accept()
-            print(f"Connected to {address}")
-        except Exception as e:
-            print(f"Error accepting connection: {e}")
-
-        if connection:
-            sd_stream = sd.OutputStream(channels=channels, samplerate=sample_rate, blocksize=4096)
-            sd_stream.start()
-
-            # try:
-            while True:
-                data = connection.recv(1024)
-                if not data:
-                    break
-
-                audio_samples = np.frombuffer(data, dtype=np.int16)
-                audio_samples_float32 = audio_samples.astype(
-                    np.float32) / 32768.0  # Convert to float32 in range [-1, 1]
-
-                sd_stream.write(audio_samples_float32)
-            # except KeyboardInterrupt:
-            #     print("Server interrupted.")
-            # finally:
-            #     connection.close()
-            #     sd_stream.stop()
+#
+# def listen_audio():
+#     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+#         server_socket.bind(('0.0.0.0', 12334))
+#         server_socket.listen(1)
+#         print("Listening for audio data...")
+#
+#         connection = None
+#
+#         try:
+#             connection, address = server_socket.accept()
+#             print(f"Connected to {address}")
+#         except Exception as e:
+#             print(f"Error accepting connection: {e}")
+#
+#         if connection:
+#             sd_stream = sd.OutputStream(channels=channels, samplerate=sample_rate, blocksize=4096)
+#             sd_stream.start()
+#
+#             # try:
+#             while True:
+#                 data = connection.recv(1024)
+#                 if not data:
+#                     break
+#
+#                 audio_samples = np.frombuffer(data, dtype=np.int16)
+#                 audio_samples_float32 = audio_samples.astype(
+#                     np.float32) / 32768.0  # Convert to float32 in range [-1, 1]
+#
+#                 sd_stream.write(audio_samples_float32)
+#             # except KeyboardInterrupt:
+#             #     print("Server interrupted.")
+#             # finally:
+#             #     connection.close()
+#             #     sd_stream.stop()
 
 
 app.run(host='0.0.0.0', port=5100)
