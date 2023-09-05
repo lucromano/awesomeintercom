@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
-
+import bcrypt
 
 env_pointer = yaml.safe_load(open('environment.yaml'))
 
@@ -46,11 +46,11 @@ def user_login(email):
 def create_user(first_name, last_name, email, password):
 
     user_uuid = str(uuid4())
-    hashed_password_ = generate_password_hash(password)
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
     cnx = mysql.connector.connect(host=mysql_host, user=mysql_user, password=mysql_password, database=mysql_database)
 
-    post_data = (user_uuid, first_name, last_name, email, hashed_password_)
+    post_data = (user_uuid, first_name, last_name, email, hashed_password)
     post_query = "INSERT INTO dim_user VALUES(%s, %s, %s, %s, %s)"
 
     cursor = cnx.cursor()

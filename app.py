@@ -1,129 +1,156 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
-import requests
+import asyncio
 import logging
-from forms import *
-from werkzeug.security import generate_password_hash, check_password_hash
-import utils
 import os
-import numpy as np
-import socket
-import sounddevice as sd
-import threading
-import time
+from aiohttp import web, WSMsgType, ClientSession
+from forms import *
+from views import *
+import aiohttp_session
+from aiohttp_session import setup, get_session, session_middleware
+from aiohttp_session.cookie_storage import EncryptedCookieStorage
+from aiohttp_security import setup as setup_security
+from aiohttp_security import SessionIdentityPolicy
+from aiohttp_security.abc import AbstractAuthorizationPolicy
+from aiohttp_security import authorized_userid
+from cryptography import fernet
+from passlib.context import CryptContext
+import utils
+import aiohttp_jinja2
+import jinja2
+import base64
+import bcrypt
 
-app = Flask(__name__)
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
 
-app.secret_key = os.urandom(24)
+async def setup_session(app):
+    fernet_key = fernet.Fernet.generate_key()
+    secret_key = base64.urlsafe_b64decode(fernet_key)
+    storage = EncryptedCookieStorage(secret_key)
+    setup(app, storage)
 
-handset_status = 'IDLE'
-listening_thread = None
-stop_audio_threads = threading.Event()
+app = web.Application()
 
-sample_rate = 44100
-channels = 1
+app.on_startup.append(setup_session)
+aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader('templates'))
+
+# Security setup
+class MyAuthorizationPolicy(AbstractAuthorizationPolicy):
+    def __init__(self):
+        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    async def authorized_userid(self, identity):
+        return identity
+
+    async def permits(self, identity, permission, context=None):
+        # You can implement custom permission checks here
+        return True
 
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if session.get('user_type') == 'user':
-        return redirect(url_for('home'))
+async def on_shutdown(app):
+    # Close any open websockets on shutdown
+    for ws in app['websockets']:
+        await ws.close()
 
+app.on_shutdown.append(on_shutdown)
+
+
+@aiohttp_jinja2.template('index.html')
+async def index(request):
+    # user_type = await authorized_userid(request)
+    session = await get_session(request)
+    user_type = session.get('user_type', None)
+
+    if user_type == 'user':
+        return web.HTTPFound('/home')
     else:
         form = LoginForm()
-
-        if form.validate_on_submit():
-            hashed_password = utils.user_login(form.email.data)[0][0]
-            password_check = check_password_hash(hashed_password, form.password.data)
-            if password_check:
-                session['user_type'] = 'user'
-                return redirect(url_for('home'))
-            else:
-                return redirect(url_for('index'))
-
-        else:
-            return render_template('index.html', form=form)
-
-
-@app.route('/home', methods=['GET', 'POST'])
-def home():
-    if session.get('user_type') == 'user':
-        global handset_status
+        # create_form = CreateForm()
 
         if request.method == 'POST':
-            data = request.get_json()
-            handset_status = data['status']
+            data = await request.post()
 
-        return render_template('home.html', handset_status=handset_status)
+            # if 'email' in data and 'password' in data:
+
+            email = data['email']
+            password = data['password']
+            hashed_password = utils.user_login(email)[0][0]
+
+            encoded_password = password.encode('utf-8')
+            encoded_hashed_password = hashed_password.encode('utf-8')
+
+            if bcrypt.checkpw(encoded_password, encoded_hashed_password):
+                session = await get_session(request)
+                session['user_type'] = 'user'
+                return web.HTTPFound('/home')
+            else:
+                return web.HTTPFound('/')
+
+            # else:
+            #     utils.create_user('Luciano', 'Romano', 'luciano@awesomeinter.com', 'luctech123!')
+
+        # return {'form': form, 'create_form': create_form}
+        return {'form': form}
+
+
+@aiohttp_jinja2.template('home.html')
+async def home(request):
+    session = await get_session(request)
+    user_type = session.get('user_type', None)
+    if user_type == 'user':
+        websocket_status = request.app.get('handset_status', 'IDLE')
+
+        if request.method == 'POST':
+            data = await request.json()
+            request.app['handset_status'] = data['status']
+
+        url_for_send_command = request.app.router['send_command'].url_for()
+
+        return {'handset_status': websocket_status, 'url_for_send_command': url_for_send_command}
+
     else:
-        return redirect(url_for('index'))
+        return web.HTTPFound('/')
 
 
-@app.route('/send_command', methods=['POST'])
-def send_command():
-    global listening_thread
-
-    command = request.get_json()['rpi_command']
+async def send_command(request):
+    data = await request.json()
+    command = data['rpi_command']
     print(command)
-
-    if command == 'answer':
-        listening_thread = threading.Thread(target=listen_audio)
-        listening_thread.start()
-    elif command == 'hangup':
-        listening_thread.join()
-        print(listening_thread)
-
     rpi_url = "http://192.168.1.111:5000/rpi_command"
-    response = requests.post(rpi_url, json={'rpi_command': command})
+    async with ClientSession() as session:
+        async with session.post(rpi_url, json={'rpi_command': command}) as response:
+            if response.status == 200:
+                return web.json_response({'message': 'command send success'})
+            else:
+                return web.json_response({'message': 'command send error'})
 
-    if response.status_code == 200:
-        return jsonify({'message': 'command send success'})
-    else:
-        return jsonify({'message': 'command send error'})
 
-
-@app.route('/voltages', methods=['GET', 'POST'])
-def voltages():
-    data = request.get_json()
+async def voltages(request):
+    data = await request.json()
     print(data)
-    return jsonify({'message': 'success'})
+    return web.json_response({'message': 'success'})
 
 
-def listen_audio():
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.bind(('0.0.0.0', 12334))
-        server_socket.listen(1)
-        print("Listening for audio data...")
+async def websocket_handler(request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
 
-        connection = None
+    app['websockets'].add(ws)
 
-        try:
-            connection, address = server_socket.accept()
-            print(f"Connected to {address}")
-        except Exception as e:
-            print(f"Error accepting connection: {e}")
+    try:
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT:
+                if msg.data == 'close':
+                    await ws.close()
+                else:
+                    # Handle websocket messages here
+                    pass
+    finally:
+        app['websockets'].remove(ws)
 
-        if connection:
-            sd_stream = sd.OutputStream(channels=channels, samplerate=sample_rate, blocksize=4096)
-            sd_stream.start()
+app.router.add_get('/', index)
+app.router.add_post('/', index)
+app.router.add_get('/home', home)
+app.router.add_post('/home', home)
+app.router.add_post('/send_command', SendCommandView, name='send_command')
+app.router.add_post('/voltages', voltages)
+app.router.add_get('/ws', websocket_handler)
 
-            # try:
-            while True:
-                data = connection.recv(1024)
-                if not data:
-                    break
-
-                audio_samples = np.frombuffer(data, dtype=np.int16)
-                audio_samples_float32 = audio_samples.astype(
-                    np.float32) / 32768.0  # Convert to float32 in range [-1, 1]
-
-                sd_stream.write(audio_samples_float32)
-            # except KeyboardInterrupt:
-            #     print("Server interrupted.")
-            # finally:
-            #     connection.close()
-            #     sd_stream.stop()
-
-
-app.run(host='0.0.0.0', port=5100)
+web.run_app(app, host='0.0.0.0', port=5100)

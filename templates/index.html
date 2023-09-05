@@ -3,18 +3,25 @@
 <head>
     <title>Dashboard</title>
     <link rel="stylesheet" href="../static/styles/styles.css">
-
 </head>
 <body>
 
 <h1>Login</h1>
 
-    <form method="POST" action="">
-        {{ form.hidden_tag() }}
-        {{ form.email(class="") }}
-        {{ form.password(class="box-lg") }}
+<form method="POST" action="">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div>
+        {{ form.email(class_="") }}
+    </div>
+    <div>
+        {{ form.password(class_="box-lg") }}
+    </div>
+    <div>
         {{ form.submit(class_="btn btn-lg") }}
-    </form>
+    </div>
+</form>
+
+
 
 </body>
 </html>

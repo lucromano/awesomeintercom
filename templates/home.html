@@ -3,15 +3,8 @@
 <head>
     <title>Dashboard</title>
     <link rel="stylesheet" href="../static/styles/styles.css">
-
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
     <script>
-    // Function to refresh the page
-    //     function refreshPage() {
-    //         location.reload();
-    //     }
-
         $(document).ready(function() {
             // Listen for clicks on buttons with the 'ajax-button' class
             $('.ajax-button').on('click', function() {
@@ -21,78 +14,14 @@
                 $.ajax({
                     method: 'POST',
                     contentType: 'application/json', // Set the Content-Type header
-                    url: '{{ url_for('send_command') }}', // Replace with your actual URL
+                    url: "{{ url_for_send_command }}", // Replace with your actual URL
                     data: JSON.stringify({ rpi_command: command }), // Convert data to JSON format
-
                 });
             });
-
-            // function updateStatus() {
-            //     $.ajax({
-            //         method: 'GET',
-            //         url: '/get_status', // Replace with your actual URL for checking status
-            //         success: function(response) {
-            //             // Update the status element with the response
-            //             $('#status-container').html(response);
-            //         },
-            //         error: function(xhr, status, error) {
-            //             console.log(error); // Log any errors
-            //         }
-            //     });
-            // }
-            //
-            // setInterval(updateStatus, 1000);
         });
-
-
-
-
-
-        //     // Listen for form submissions and trigger refresh on success
-        //     $('form').on('submit', function(event) {
-        //         event.preventDefault(); // Prevent the default form submission
-        //
-        //         // Perform the AJAX POST request
-        //         $.post({
-        //             url: '/', // Replace with your actual URL
-        //             data: $(this).serialize(),
-        //             success: function () {
-        //                 refreshPage(); // Refresh the page on successful POST
-        //             }
-        //         });
-        //     });
-        // });
     </script>
-
-
-
-
-<!--    <script>-->
-<!--            // Function to refresh the page every 'interval' milliseconds-->
-<!--            function refreshPage() {-->
-<!--                location.reload();-->
-<!--            }-->
-
-<!--            // Refresh the page every 5 seconds (5000 milliseconds)-->
-<!--            setInterval(refreshPage, 5000);-->
-<!--    </script>-->
-<!--    -->
 </head>
 <body>
-
-<!--    <div class="handset-status" id="status-container">-->
-<!--        {% if handset_status == 'ringing' %}-->
-<!--            <p class="ringing">{{ handset_status }}</p>-->
-<!--        {% elif handset_status == 'answered' %}-->
-<!--            <p class="answered">{{ handset_status }}</p>-->
-<!--        {% elif handset_status == 'opened' %}-->
-<!--            <p class="opened">{{ handset_status }}</p>-->
-<!--        {% else %}-->
-<!--            <p>{{ handset_status }}</p>-->
-<!--        {% endif %}-->
-<!--    </div>-->
-
-
     <div class="handset-status">
         {% if handset_status == 'ringing' %}
             <p class="ringing">{{ handset_status }}</p>
@@ -105,16 +34,10 @@
         {% endif %}
     </div>
 
-    <form id="command-form" method="post" action="{{ url_for('send_command') }}">
+    <form id="command-form" method="post" action="{{ url_for_send_command }}">
         <button type="button" class="ajax-button" data-command="answer">Answer</button>
         <button type="button" class="ajax-button" data-command="open">Open Door</button>
         <button type="button" class="ajax-button" data-command="hangup">Hang Up</button>
     </form>
-
-<!--    <form method="post" action="{{ url_for('send_command') }}">-->
-<!--        <button type="submit" name="command" value="answer">Answer</button>-->
-<!--        <button type="submit" name="command" value="open">Open Door</button>-->
-<!--        <button type="submit" name="command" value="hangup">Hang Up</button>-->
-<!--    </form>-->
 </body>
 </html>
