@@ -1,82 +1,74 @@
 import automationhat as ah
-from flask import Flask, request, jsonify
 import time
 import threading
-import requests
+import asyncio
+import aiohttp
+import websockets
+import json
 
 ah.enable_auto_lights(False)
+a1_lock = threading.Lock()
+a2_lock = threading.Lock()
 
 
-lock = threading.Lock()
-
-app = Flask(__name__)
-
-
-def poll_inputs():
+async def poll_inputs():
     while True:
 
-        with lock:
+        with a1_lock:
             a1 = ah.analog.one.read()
+        with a2_lock:
             a2 = ah.analog.two.read()
-            a3 = ah.analog.three.read()
-            r1 = ah.relay.one.read()
-            r2 = ah.relay.two.read()
-            r3 = ah.relay.three.read()
 
             if a1 > 3.0 and a2 > 3.0:
                 send_status('ringing')
             elif 0.5 > a1 > 1.5 and 1.0 > a2 > 5.0:
                 send_status('answered')
 
-            send_hat_reads(a1, a2, a3, r1, r2, r3)
+            send_hat_reads(a1, a2)
 
         time.sleep(0.25)
 
 
-def send_hat_reads(a1, a2, a3, r1, r2, r3):
-    voltages_url = "http://192.168.1.105:5100/voltages"
-    response = requests.post(voltages_url, json={'reads': [a1, a2, a3, r1, r2, r3]})
+async def send_hat_reads(a1, a2):
+    async with aiohttp.ClientSession() as session:
+        async with session.ws_connect('ws://192.168.1.107:5100/websocket') as ws:
+            await ws.send_json({'reads': [a1, a2]})
 
 
-def send_status(status):
-    status_url = "http://192.168.1.105:5100/"
-    response = requests.post(status_url, json={'status': status})
-
-    if response.status_code == 200:
-        print("Status sent: {}".format(status))
-    else:
-        print("Status failed: {}".format(status))
+async def send_status(status):
+    async with aiohttp.ClientSession() as session:
+        async with session.ws_connect('ws://192.168.1.107:5100/websocket') as ws:
+            await ws.send_json({'status': status})
 
 
-@app.route('/rpi_command', methods=['GET', 'POST'])
-def rpi_command():
-    data = request.get_json()
-    command = data['rpi_command']
-
-    if command == 'answer':
-        ah.relay.two.on()
-        ah.relay.three.on()
-        ah.output.one.on()
-        time.sleep(0.3)
-    elif command == 'open':
-        ah.relay.one.on()
-        time.sleep(0.3)
-        ah.relay.one.off()
-        send_status('opened')
-    elif command == 'hangup':
-        ah.relay.two.off()
-        ah.relay.three.off()
-        ah.output.one.off()
-        time.sleep(0.3)
-        send_status('idle')
-
-    return jsonify({'message': 'success'})
+async def receive_commands():
+    async with websockets.connect('ws://192.168.1.111:5000/receive_commands') as websocket:
+        async for message in websocket:
+            data = json.loads(message)
+            command = data['rpi_command']
+            if command == 'answer':
+                ah.relay.one.on()
+                ah.relay.two.on()
+                await asyncio.sleep(0.3)
+            elif command == 'open':
+                ah.relay.three.on()
+                await asyncio.sleep(0.2)
+                ah.relay.three.off()
+                await send_status('opened')
+            elif command == 'hangup':
+                ah.relay.one.off()
+                ah.relay.two.off()
+                await asyncio.sleep(0.3)
+                await send_status('idle')
 
 
-polling_thread = threading.Thread(target=poll_inputs)
-polling_thread.daemon = True
-polling_thread.start()
-app.run(host='0.0.0.0', port=5000)
+async def main():
+    # Start all the asynchronous tasks
+    tasks = [poll_inputs(), receive_commands()]
+    await asyncio.gather(*tasks)
+
+asyncio.run(main())
+
 
 
 
